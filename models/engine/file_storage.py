@@ -5,17 +5,13 @@ Module - File Storage
 
 
 import json
-from models.base_model import BaseModel
-from models.user import User
-from models.state import State
-from models.city import City
 from models.amenity import Amenity
+from models.base_model import BaseModel
+from models.city import City
 from models.place import Place
 from models.review import Review
-classes = {"BaseModel": BaseModel, "User": User, "State": State,
-           "City": City, "Amenity": Amenity,
-           "Place": Place, "Review": Review
-           }
+from models.state import State
+from models.user import User
 
 
 class FileStorage:
@@ -26,11 +22,17 @@ class FileStorage:
     __file_path = "file.json"
     __objects = {}
 
-    def all(self):
+    def all(self, cls=None):
         """
         Public instance method
         Returns the dictionary __objects
         """
+        if cls is not None:
+            new_dict = {}
+            for key, value in self.__objects.items():
+                if cls == value.__class__:
+                    new_dict[key] = value
+            return new_dict
         return (self.__objects)
 
     def new(self, obj):
@@ -55,6 +57,7 @@ class FileStorage:
 
     def reload(self):
         """
+        Public instance method
         deserializes the JSON file to __objects
         """
         try:
@@ -64,3 +67,13 @@ class FileStorage:
                 self.__objects[k] = classes[item[k]["__class__"]](**item[k])
         except:
             pass
+
+    def delete(self, obj=None):
+        """
+        Public instance method
+        delete obj from __objects if its inside
+        """
+        if obj is not None:
+            key = obj.__class__.__name__ + '.' + obj.id
+            if key in self.__objects:
+                del self.__objects[key]
