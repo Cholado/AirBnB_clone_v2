@@ -3,23 +3,22 @@
 Module - console
 """
 
-from models.state import State
-from models.city import City
-from models.amenity import Amenity
-from models.place import Place
-from models.review import Review
+
 import cmd
 from datetime import datetime
-from models.base_model import BaseModel
-from models.user import User
 import models
+from models.amenity import Amenity
+from models.base_model import BaseModel
+from models.city import City
+from models.place import Place
+from models.review import Review
+from models.state import State
+from models.user import User
 import shlex
-import ast
-from models import storage
-classes = ["BaseModel", "User", "State", "City", "Amenity", "Place", "Review"]
-ints = "number_rooms, number_bathrooms, max_guest, price_by_night"
-floats = "latitude, longitud"
-commands = ["all", "count", "show", "destroy", "update"]
+
+
+classes = {"Amenity": Amenity, "BaseModel": BaseModel, "City": City,
+           "Place": Place, "Review": Review, "State": State, "User": User}
 
 
 class HBNBCommand(cmd.Cmd):
@@ -27,47 +26,6 @@ class HBNBCommand(cmd.Cmd):
     class console - entry point of the command interpreter
     """
     prompt = '(hbnb)'
-
-    def default(self, line):
-        """Parses input by splitting arguments"""
-        clase = line.split(".", 1)
-        if len(clase) < 2:
-            return
-        if clase[0] not in classes:
-            return
-        command = clase[1].split("(", 1)
-        if command[0] not in commands or len(command) < 2:
-            return
-        args = command[1][:-1]
-        if command[0] == "show":
-            return self.do_show(clase[0] + " " + args)
-        if command[0] == "all":
-            return self.do_all(clase[0] + " " + args)
-        if command[0] == "count":
-            return self.do_count(clase[0] + " " + args)
-        if command[0] == "destroy":
-            return self.do_destroy(clase[0] + " " + args)
-        if command[0] == "update":
-            if len(args) < 1:
-                return
-            attr_val = args.split(",", 1)
-            if len(attr_val) < 2:
-                return
-            else:
-                args = args.split(",", 2)
-                return self.do_update(" ".join([clase[0]] + args))
-
-    def do_count(self, args):
-        """Retrieve the number of instances of a class"""
-        args = shlex.split(args)
-        if len(args) < 1:
-            return
-        _nb_objects = 0
-        items = storage.all()
-        for key in items:
-            if items[key].__class__.__name__ == args[0]:
-                _nb_objects += 1
-        print(_nb_objects)
 
     def do_EOF(self, args):
         """
@@ -90,18 +48,46 @@ class HBNBCommand(cmd.Cmd):
         """
         return True
 
+    def _key_value_parser(self, args):
+        """
+        public instance method
+        craft dictionary from list of strings input
+        """
+        new_dict = {}
+        for arg in args:
+            if "=" in arg:
+                kvp = arg.split('=', 1)
+                key = kvp[0]
+                value = kvp[1]
+                if value[0] == value[-1] == '"':
+                    value = shlex.split(value)[0].replace('_', ' ')
+                else:
+                    try:
+                        value = int(value)
+                    except:
+                        try:
+                            value = float(value)
+                        except:
+                            continue
+                new_dict[key] = value
+        return new_dict
+
     def do_create(self, args):
         """
         public instance method
         Creates a new instance of BaseModel
         saves it (to the JSON file) and prints the id.
         """
-        args = shlex.split(args)
+
+        args = args.split()
         if len(args) == 0:
             print("** class name missing **")
             return False
         if args[0] in classes:
-            instance = eval(args[0])()
+            instance = classes[args[0]]()
+            new_dict = self._key_value_parser(args[1:])
+            for key, value in new_dict.items():
+                setattr(instance, key, value)
         else:
             print("** class doesn't exist **")
             return False
@@ -160,21 +146,20 @@ class HBNBCommand(cmd.Cmd):
         of all instances based or not on the class name.
         """
         args = shlex.split(args)
-        my_list = []
+        obj_list = []
         if len(args) == 0:
-            for item in models.storage.all().values():
-                my_list.append(str(item))
-            print("", end="")
-            print(", ".join(my_list), end="")
-            print("")
-
+            for value in models.storage.all().values():
+                obj_list.append(str(value))
+            print("[", end="")
+            print(", ".join(obj_list), end="")
+            print("]")
         elif args[0] in classes:
             for key in models.storage.all():
                 if args[0] in key:
-                    my_list.append(str(models.storage.all()[key]))
-            print("", end="")
-            print(", ".join(my_list), end="")
-            print("")
+                    obj_list.append(str(models.storage.all()[key]))
+            print("[", end="")
+            print(", ".join(obj_list), end="")
+            print("]")
         else:
             print("** class doesn't exist **")
 
@@ -186,25 +171,28 @@ class HBNBCommand(cmd.Cmd):
         save the change into the JSON file
         """
         args = shlex.split(args)
+        integers = ["number_rooms", "number_bathrooms", "max_guest",
+                    "price_by_night"]
+        floats = ["latitude", "longitude"]
         if len(args) == 0:
             print("** class name missing **")
-            return False
         elif args[0] in classes:
             if len(args) > 1:
                 k = args[0] + "." + args[1]
                 if k in models.storage.all():
                     if len(args) > 2:
                         if len(args) > 3:
-                            try:
-                                if isinstance(args[2], datetime) is True:
-                                    pass
-                                if args[0] in classes:
-                                    if isinstance(args[2], ints) is True:
+                            if args[0] == "Place":
+                                if args[2] in integers:
+                                    try:
                                         args[3] = int(args[3])
-                                    elif isinstance(args[2], floats) is True:
+                                    except:
+                                        args[3] = 0
+                                elif args[2] in floats:
+                                    try:
                                         args[3] = float(args[3])
-                            except:
-                                pass
+                                    except:
+                                        args[3] = 0.0
                             setattr(models.storage.all()[k], args[2], args[3])
                             models.storage.all()[k].save()
                         else:
