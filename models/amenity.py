@@ -3,14 +3,27 @@
 Module - amenity
 """
 
-from models.base_model import BaseModel
+
+import models
+from models.base_model import BaseModel, Base
+from os import getenv
+import sqlalchemy
+from sqlalchemy import Column, String
+from sqlalchemy.orm import relationship
 
 
-class Amenity(BaseModel):
+class Amenity(BaseModel, Base):
     """
     subclass - Amenity / inherits from BaseModel
     """
-    name = ""
+    if models.storage_t == 'db':
+        __tablename__ = 'amenities'
+        name = Column(String(128), nullable=False)
+        place_amenities = relationship("Place", secondary="place_amenity",
+                                       back_populates="amenities",
+                                       viewonly=False)
+    else:
+        name = ""
 
     def __init__(self, *args, **kwargs):
         """

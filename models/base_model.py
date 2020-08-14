@@ -7,13 +7,28 @@ Module - Base Model
 from datetime import datetime
 import uuid
 import models
+from os import getenv
+import sqlalchemy
+from sqlalchemy import Column, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+
 f_t = "%Y-%m-%dT%H:%M:%S.%f"  # ISO time format
+
+if models.storage_t == "db":
+    Base = declarative_base()
+else:
+    Base = object
 
 
 class BaseModel():
     """
     Defines all common attributes/methods for other classes
     """
+    if models.storage_t == "db":
+        id = Column(String(60), primary_key=True)
+        created_at = Column(DateTime, default=datetime.utcnow)
+        updated_at = Column(DateTime, default=datetime.utcnow)
+
     def __init__(self, *args, **kwargs):
         """
         Initialize public class attributes:
@@ -26,16 +41,21 @@ class BaseModel():
             for key, value in kwargs.items():
                 if key != "__class__":
                     setattr(self, key, value)
-            if hasattr(self, "created_at") and type(self.created_at) is str:
-                self.created_at = datetime.strptime(kwargs["created_at"], f_t)
-            if hasattr(self, "updated_at") and type(self.updated_at) is str:
-                self.updated_at = datetime.strptime(kwargs["updated_at"], f_t)
+            if kwargs.get("created_at", None) and type(self.created_at) is str:
+                self.created_at = datetime.strptime(kwargs["created_at"], time)
+            else:
+                self.created_at = datetime.utcnow()
+            if kwargs.get("updated_at", None) and type(self.updated_at) is str:
+                self.updated_at = datetime.strptime(kwargs["updated_at"], time)
+            else:
+                self.updated_at = datetime.utcnow()
+            if kwargs.get("id", None) is None:
+                self.id = str(uuid.uuid4())
         else:
             self.id = str(uuid.uuid4())
-            self.created_at = datetime.now()
+            self.created_at = datetime.utcnow()
             self.updated_at = self.created_at
-            models.storage.new(self)
-            models.storage.save()
+
 
     def __str__(self):
         """
@@ -51,7 +71,8 @@ class BaseModel():
         public class method - save
         updates the public class attribute updated_at with current datatime
         """
-        self.updated_at = datetime.now()
+        self.updated_at = datetime.utcnow()
+        models.storage.new(self)
         models.storage.save()
 
     def to_dict(self):
@@ -62,9 +83,19 @@ class BaseModel():
         display datetime format as:
         Year-Month-DayTHour:Minutes:Seconds.Milliseconds
         """
+        new_dict = self.__dict__.copy()
+        if "created_at" in new_dict:
+            new_dict["created_at"] = new_dict["created_at"].strftime(time)
+        if "updated_at" in new_dict:
+            new_dict["updated_at"] = new_dict["updated_at"].strftime(time)
+        new_dict["__class__"] = self.__class__.__name__
+        if "_sa_instance_state" in new_dict:
+            del new_dict["_sa_instance_state"]
+        return new_dict
 
-        d = self.__dict__.copy()
-        d["created_at"] = d["created_at"].strftime(f_t)
-        d["updated_at"] = d["updated_at"].strftime(f_t)
-        d["__class__"] = self.__class__.__name__
-        return d
+    def delete(self):
+        """
+        public class method - delete
+        deletes current instance from the file storage
+        """
+        models.storage.delete(self)
