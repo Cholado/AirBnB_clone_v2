@@ -12,7 +12,7 @@ from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
 
 
-class User(BaseModel):
+class User(BaseModel, Base):
     """
     subclass - User / inherits from BaseModel
     """
